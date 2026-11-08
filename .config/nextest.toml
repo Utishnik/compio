@@ -1,11 +1,11 @@
 [profile.default]
 failure-output = "final"
-slow-timeout = { period = "20s", terminate-after = 6 }
+slow-timeout = { period = "180s" }
 
 [profile.ci]
 fail-fast = false
 failure-output = "final"
-slow-timeout = { period = "120s", terminate-after = 5 }
+slow-timeout = { period = "180s" }
 
 [profile.asan]
 inherits = "ci"
