@@ -35,6 +35,7 @@ bitflags = { version = "2.11.0" }
 paste = { workspace = true }
 mod_use = { workspace = true }
 rustix = { workspace = true, features = ["net"] }
+kanal = {git = "https://github.com/Utishnik/kanal.git"}
 
 # Windows specific dependencies
 [target.'cfg(windows)'.dependencies]

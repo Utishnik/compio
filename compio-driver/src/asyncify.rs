@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use flume::{Receiver, Sender, TrySendError, bounded};
+use kanal::{Receiver, Sender, bounded,SendTimeoutError};
 
 /// An error that may be emitted when all worker threads are busy.
 ///
@@ -113,7 +113,7 @@ impl AsyncifyPool {
         match self.sender.try_send(Box::new(f) as BoxedDispatchable) {
             Ok(_) => Ok(()),
             Err(e) => match e {
-                TrySendError::Full(f) => {
+                SendTimeoutError::Closed(f) => {
                     if self.thread_limit == 0 {
                         panic!("the thread pool is needed but no worker thread is running");
                     } else if self.counter.load(Ordering::Acquire) >= self.thread_limit {
@@ -131,7 +131,7 @@ impl AsyncifyPool {
                         Ok(())
                     }
                 }
-                TrySendError::Disconnected(_) => {
+                SendTimeoutError::Timeout(_) => {
                     unreachable!("receiver should not all disconnected")
                 }
             },
