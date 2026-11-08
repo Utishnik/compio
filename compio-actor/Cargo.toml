@@ -17,6 +17,7 @@ futures-channel = { workspace = true }
 futures-util = { workspace = true }
 pin-project-lite = { workspace = true }
 scoped-tls = { workspace = true }
+crossfire = "3.1.22"
 
 [dev-dependencies]
 compio-macros = { workspace = true }

@@ -8,7 +8,7 @@ use std::{
     task::{Context, Poll, ready},
 };
 
-use futures_channel::oneshot;
+use crossfire::oneshot;
 use futures_util::FutureExt;
 
 use super::Cluster;
@@ -130,8 +130,8 @@ pub enum SpawnFuture<A: Actor> {
     #[doc(hidden)]
     Pending {
         mailbox: Mailbox<A>,
-        result: oneshot::Receiver<Result<ActorExit<A::Error>, ()>>,
-        started: oneshot::Receiver<Result<(), A::Error>>,
+        result: oneshot::RxOneshot<Result<ActorExit<A::Error>, ()>>,
+        started: oneshot::RxOneshot<Result<(), A::Error>>,
     },
 }
 
@@ -142,8 +142,8 @@ impl<A: Actor> SpawnFuture<A> {
 
     fn pending(
         mailbox: Mailbox<A>,
-        result: oneshot::Receiver<Result<ActorExit<A::Error>, ()>>,
-        started: oneshot::Receiver<Result<(), A::Error>>,
+        result: oneshot::RxOneshot<Result<ActorExit<A::Error>, ()>>,
+        started: oneshot::RxOneshot<Result<(), A::Error>>,
     ) -> Self {
         Self::Pending {
             mailbox,
@@ -208,7 +208,7 @@ impl Cluster {
 
         let (mailbox, receiver) = make_mailbox::<A>(name, capacity);
         let actor_ref = mailbox.clone();
-        let (started_tx, started_rx) = oneshot::channel();
+        let (started_tx, started_rx) = oneshot::oneshot();
         let cluster = self.clone();
         let result = {
             let dispatcher = self.inner.dispatcher.lock().unwrap();
@@ -223,7 +223,7 @@ impl Cluster {
                         Ok(state) => state,
                         Err(error) => {
                             reg.take();
-                            started_tx.send(Err(error)).ok();
+                            started_tx.send(Err(error));
                             return Err(());
                         }
                     };
@@ -231,11 +231,13 @@ impl Cluster {
                         registration.activate(&actor_ref);
                     }
 
-                    if started_tx.send(Ok(())).is_err() {
+                    if started_tx.is_disconnected() {
                         let exit =
                             finish(&actor, &actor_ref, receiver, &mut state, ActorExit::Stopped)
                                 .await;
                         return Ok(exit);
+                    } else {
+                        started_tx.send(Ok(()))
                     }
 
                     let exit = run(

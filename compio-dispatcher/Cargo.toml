@@ -18,8 +18,9 @@ rustdoc-args = ["--cfg", "docsrs"]
 compio-driver = { workspace = true }
 compio-runtime = { workspace = true }
 
-flume = { workspace = true, default-features = false, features = ["async"] }
 futures-channel = { workspace = true }
+crossfire = "3.1.22"
+kanal = {git = "https://github.com/Utishnik/kanal.git"}
 
 [dev-dependencies]
 compio-buf = { workspace = true }
