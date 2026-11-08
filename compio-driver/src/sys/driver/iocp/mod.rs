@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use flume::{Receiver, Sender};
+use kanal::{Receiver, Sender};
 use windows_sys::Win32::{Foundation::ERROR_OPERATION_ABORTED, System::IO::OVERLAPPED};
 
 use crate::{
@@ -48,7 +48,7 @@ impl Driver {
         let driver = port.as_raw_handle() as _;
         let overlapped = Overlapped::new(driver);
         let notify = Arc::new(Notify::new(port, overlapped));
-        let (completed_tx, completed_rx) = flume::unbounded();
+        let (completed_tx, completed_rx) = kanal::unbounded();
 
         Ok(Self {
             notify,
@@ -188,8 +188,10 @@ impl Driver {
         let notify = &self.notify.overlapped as *const Overlapped;
 
         let mut has_entry = false;
-        while let Ok(entry) = self.completed_rx.try_recv() {
-            entry.notify();
+        while let Ok(entry) = self.completed_rx.try_recv()
+            && let Some(some_entry) = entry
+        {
+            some_entry.notify();
             has_entry = true;
         }
         if self.notify.reset() {
