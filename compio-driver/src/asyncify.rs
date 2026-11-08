@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use kanal::{Receiver, SendError, Sender, bounded};
+use kanal::{Receiver, SendTimeoutError, Sender, bounded};
 
 /// An error that may be emitted when all worker threads are busy.
 ///
@@ -110,27 +110,28 @@ impl AsyncifyPool {
     /// limit has been reached, it will return an error with the original
     /// dispatchable.
     pub fn dispatch<D: Dispatchable>(&self, f: D) -> Result<(), DispatchError<D>> {
-        match self.sender.send(Box::new(f) as BoxedDispatchable) {
+        match self.sender.try_send(Box::new(f) as BoxedDispatchable) {
             Ok(_) => Ok(()),
-            Err(e) => {
-                let f = e.0;
-                if self.thread_limit == 0 {
-                    panic!("the thread pool is needed but no worker thread is running");
-                } else if self.counter.load(Ordering::Acquire) >= self.thread_limit {
-                    // SAFETY: we can ensure the type
-                    Err(DispatchError(*unsafe {
-                        Box::from_raw(Box::into_raw(f).cast())
-                    }))
-                } else {
-                    std::thread::spawn(worker(
-                        self.receiver.clone(),
-                        self.counter.clone(),
-                        self.recv_timeout,
-                    ));
-                    self.sender.send(f).expect("the channel should not be full");
-                    Ok(())
+            Err(e) => match e {
+                SendTimeoutError::Closed(f) | SendTimeoutError::Timeout(f) => {
+                    if self.thread_limit == 0 {
+                        panic!("the thread pool is needed but no worker thread is running");
+                    } else if self.counter.load(Ordering::Acquire) >= self.thread_limit {
+                        // SAFETY: we can ensure the type
+                        Err(DispatchError(*unsafe {
+                            Box::from_raw(Box::into_raw(f).cast())
+                        }))
+                    } else {
+                        std::thread::spawn(worker(
+                            self.receiver.clone(),
+                            self.counter.clone(),
+                            self.recv_timeout,
+                        ));
+                        self.sender.send(f).expect("the channel should not be full");
+                        Ok(())
+                    }
                 }
-            }
+            },
         }
     }
 }
